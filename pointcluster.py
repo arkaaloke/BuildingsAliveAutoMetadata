@@ -4,6 +4,9 @@ from expand import *
 import random
 
 class PointCluster:
+	'''
+	Treating each cluster (calculated according to syntactic clustering) as a separate object
+	'''
 	def __init__(self, clusternum):
 		self.points = []
 		self.gt = {}
@@ -25,6 +28,9 @@ class PointCluster:
 		self.incorrectlyDone = []
 		self.lastStringLeft = []
 
+	'''
+	Select next example from the cluster to present to expert for expansion
+	'''
 	def getNextExample(self, expType):
 		
 		newExample = None
@@ -43,17 +49,31 @@ class PointCluster:
 
 		return newExample
 
+	'''
+	Once an expert provides an example, save it 
+	'''
 	def addNewExample(self, point, desc):
 		self.ep.addNewExample(point, desc)
 		self.examples.append(point)
 		print >> sys.stderr, "Cluster : %d . Example added : %s " % (self.clusternum, point)
 
+	'''
+	Apply the rules learned on all points
+	'''
 	def applyOnPoints(self):
 		self.ep.applyOnPoints( self.points)
-		
+	
+	'''
+	RequiredPoints are the points which are required for a specific application.
+	E.g the required points for a Rogue Zone application are only the zone temperature sensors and zone temperature setpoints
+	If you want to expand and normalize all points, then this is simply the list of all points	
+	'''	
 	def addRequiredPoints(self, points):
 		self.requiredPoints = list(points)
 
+	'''
+	Add all the points and ground-truth information
+	'''
 	def addPoints(self, points, groundtruth, correctTags):
 		for point in points:
 			self.points.append(point)
@@ -63,9 +83,17 @@ class PointCluster:
 		self.ep.init()
 		self.incorrectQualifications = len(points)
 
+	'''
+	Setting the threshold of when this code should consider itself done.
+	threshold can be 90%, 99% etc
+	'''
 	def setThreshold(self, threshold):
 		self.threshold = threshold
 
+	'''
+	Applies the program synthesis and gets back the expanded normalized metadata
+	We also store it in this object
+	'''
 	def getExpandedResults(self):
 		[expandedPoints, keyPredicates, examples] =  self.ep.getData()
 		self.expandedPoints = {}
@@ -75,6 +103,9 @@ class PointCluster:
 				continue
 			self.expandedPoints[point] = expandedPoints[point]
 
+	'''
+	Compute how many points remain to be normalized. Compare with ground truth.
+	'''
 	def computeRemaining(self):
 		self.incorrect = 0
 		self.correct = 0
@@ -103,11 +134,18 @@ class PointCluster:
 		print >>sys.stderr, self.clusternum, "Incorrect : ",self.incorrect, "Correct :", self.correct
 		return self.incorrect
 
+	'''
+	Check if you have expanded/normalized the required threshold of points
+	'''
 	def done(self):
 		if self.correct > self.threshold * len(self.points):
 			return True
 		else:
 			return False	
+	
+	'''
+	Pick a random point from the remaining points to be expanded, to present to the expert
+	'''
 	def randomize(self):
 		l = len(self.notDone)	
 		if l == 0:
@@ -117,7 +155,9 @@ class PointCluster:
 		return newExample
 
 
-		
+	'''
+	Pick the point which has minimum number of characters left to be expanded
+	'''	
 	def minLeft(self):
 	
 		for point in sorted(percentDone, key=percentDone.get, reverse=True):
@@ -127,6 +167,9 @@ class PointCluster:
 
 		return None
 
+	'''
+	Pick the point which has maximum number of characters left to be expanded
+	'''	
 	def maxLeft(self):
 		for point in sorted(percentDone, key=percentDone.get):
 			if point not in existingExamples and percentDone[point] < 99.0:
@@ -136,6 +179,12 @@ class PointCluster:
 		return None
 
 
+	'''
+	A more complex algorithm to select the next example.
+	It tries to pick a point which has the most common unexpanded substring
+	E.g if a substring VAV is unexplained in a lot of points, choose a point with that substring.
+	The paper shows that this does not really give any significant advantage
+	'''
 	def maxCommonLeft(self):
 		amtLeft = {}
 		stringsLeft = {}

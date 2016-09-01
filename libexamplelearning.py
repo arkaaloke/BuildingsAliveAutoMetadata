@@ -5,6 +5,12 @@ import numpy
 import itertools
 
 
+'''
+given a point, a key and its value , e.g key:zone temp sensor , value:ART, valueType: v or c (depending on whether it is a constant or variable acc. to the paper),
+ the starting position of the key in the point string, 
+and the keys to its left and keys to its right, find all possible regular expressions which according to our language can extract
+that substring
+''' 
 def generateAllPossibleOptions(point, key, value, valueType, startPos, leftKeys, rightKeys):
 	possibilities = {}
 
@@ -18,78 +24,14 @@ def generateAllPossibleOptions(point, key, value, valueType, startPos, leftKeys,
 	y1 = GeneratePosition(point, startPos, knownKeys)
 	y2 = GeneratePosition(point, startPos + len(value) , knownKeys, len(value))
 	
-	'''
-	if valueType == 'c':
-		newLeftKeys = leftKeys[:]
-		newLeftKeys.append((key, startPos))
-		y2 = GeneratePosition(point, startPos + len(value), newLeftKeys, rightKeys )
-	else:
-		y2 = GeneratePosition(point, startPos + len(value), leftKeys, rightKeys )
-	'''
 	possibilities["left"] = y1
 	possibilities["right"] = y2
 	
 	return possibilities
-		
 
-def combinatorialKnownTokens(inString, startPos, endPos, knownKeys):
-	knownKeyValues = [ k[0].split('=')[-1].strip() for k in knownKeys ] 
-	knownKeyIndices = [ k[1] for k in knownKeys ]
-
-	keysToAppend = []
-	for i in range(len(knownKeyIndices)):
-		if knownKeyIndices[i] >= startPos and knownKeyIndices[i] < endPos and knownKeyIndices[i] + len(knownKeyValues[i]) <= endPos:
-			keysToAppend.append(knownKeys[i])
-
-	r1 = []
-	for L in range(0, len(keysToAppend)+1):
-		for subset in itertools.combinations(keysToAppend, L):
-			arr = list(subset)
-			r1.append( GenerateKnownTokens(inString, startPos, endPos, knownKeys))
-
-	return r1
-
-def GenerateKnownTokens(inString, startPos, endPos, knownKeys):
-	regex = []
-	knownKeyValues = [ k[0].split('=')[-1].strip() for k in knownKeys ]
-	knownKeyIndices = [ k[1] for k in knownKeys ]
-
-	i = startPos
-	while i < endPos:
-		if i in knownKeyIndices:
-			value = knownKeyValues[ knownKeyIndices.index(i) ]
-			for j in range(len(value)):
-				regex.append(value[j])
-			i += len(value)
-		elif len(re.compile('[A-Za-z]').findall(inString[i])) == 1:
-			regex.append('[A-Za-z]')
-			i += 1
-		elif len(re.compile('[0-9]').findall(inString[i])) == 1:
-			regex.append('[0-9]')
-			i += 1
-		else:
-			regex.append('\\' + inString[i])
-			i += 1
-
-	i = 0
-	ending = len(regex)
-	regexString = ""
-	prevRegex = ""
-	flag = 1
-	while i  < ending:
-		if regex[i] == prevRegex :
-			if flag == 1:
-				regexString += "+"
-				flag = 0
-		else:
-			regexString += regex[i]
-			flag = 1
-		
-		prevRegex = regex[i]
-		i += 1
-
-	return regexString
-
+'''
+according to our language, generate all possible regular expressions which extract the position 'k' in the 'inString'
+'''		
 def GeneratePosition(inString, k, knownKeys, length=None ):
 
 	result = [ ("cpos",k) ]
@@ -122,6 +64,9 @@ def GeneratePosition(inString, k, knownKeys, length=None ):
 	return deduplicatedResult
 
 
+'''
+Get which nummber match it is ; i.e the value of 'c' in PrecedeSucceed(r1, r2, c)
+'''
 def getMatchNumber(inString, r1,r2, pos):
 
 	#print "Trying to match ", inString, r1, r2, "pos = ", pos
@@ -156,19 +101,9 @@ def getMatchNumber(inString, r1,r2, pos):
 	#print "returning None"
 	return None
 
-	'''
-	totalRegex = r1 + r2
-	c = 1
-	for match in re.finditer(totalRegex, inString):
-		(start, end) = match.span()
-		#print "START, END",start, end, inString, pos
-		if start <= pos and pos <= end:
-			return c
-		else:
-			c = c + 1
-
-	'''
-
+'''
+check to see that the Position p1 or p2 (refer to paper) is not in the middle of substring which has another expansion
+'''
 def inTheMiddle(inString, knownKeys, startPos):
 	knownKeyValues = [ k[0].split('=')[-1].strip() for k in knownKeys ]
 	knownKeyIndices = [ k[1] for k in knownKeys ]
@@ -180,6 +115,9 @@ def inTheMiddle(inString, knownKeys, startPos):
 			return True
 	return False
 
+'''
+get token sequence (acc to our language) to represent the characters between startPos and endPos
+'''
 def getTokenSequence(inString, startPos, endPos, knownKeys):
 
 	knownKeyValues = [ k[0].split('=')[-1].strip() for k in knownKeys ]
@@ -204,23 +142,20 @@ def getTokenSequence(inString, startPos, endPos, knownKeys):
 	ending = len(regex)
 	regexString = ""
 	prevRegex = ""
-	flag = 1
-	'''
-	while i  < ending:
-		if regex[i] != prevRegex :
-			regexString += regex[i] + "+"
-		
-		prevRegex = regex[i]
-		i += 1
 
-	return regexString
-	'''
 	while i < ending:
 		regexString += regex[i]
 		i += 1
 
 	return regexString
 
+'''
+merge the regular expression rules created for a particular key with other rules for that key created from other examples.
+traceSets = the list of rules for a particular example
+key = the key for which to merge the regular expressions
+examplePointList = the examples supplied by the expert till now which have that key
+The algorithm is taken from the paper "S.Gulwani 'Automating string processing in spreadsheets using input-output examples", POPL 2011'
+'''
 def mergeKeyPossibilities(key, traceSets, examplePointList):
 
 	remainingPointLists = examplePointList[:]
@@ -228,11 +163,6 @@ def mergeKeyPossibilities(key, traceSets, examplePointList):
 
 
 	while True:
-		#if key == 'site':
-		#	print "Inside merging loop"
-		#	print remainingTraceSets
-		#	print remainingPointLists
-
 		l = len(remainingTraceSets)
 		if l == 1:
 			break
@@ -266,12 +196,6 @@ def mergeKeyPossibilities(key, traceSets, examplePointList):
 					C2_scores[i,j] = float( numEleIntersectedSet ) / float( max( numEleSetI, numEleSetJ )) 
 
 
-		#print remainingPointLists
-		#for row in range(l):
-		#	for col in range(l):
-		#		print C1_scores[row, col],
-		#	print
-
 		max_i = 0
 		max_j = 1
 		for i in range(l):
@@ -291,16 +215,8 @@ def mergeKeyPossibilities(key, traceSets, examplePointList):
 		newRemainingPointLists = []
 		
 		if C1_scores[max_i, max_j] >= 1.0:
-			#print "merging : ",remainingPointLists[i], remainingPointLists[j]
 
-			#print "INTERSECTION 3"
-			#print "max_i max_j",max_i, max_j
 			(c, intersectedSet) = common(remainingTraceSets[max_i], remainingTraceSets[max_j], True, False)
-			#if key == 'site':
-			#print "max_i, max_j",max_i, max_j
-			#print intersectedSet
-
-			#print "Merging : ",remainingPointLists[max_i], "and", remainingPointLists[max_j]
 			for i in range(len(remainingTraceSets)):
 				if i != max_i and i != max_j:
 					newRemainingTraceSets.append(remainingTraceSets[i])
@@ -323,11 +239,11 @@ def mergeKeyPossibilities(key, traceSets, examplePointList):
 
 	return (remainingPointLists, remainingTraceSets)	
 			
-
+'''
+Find the common regular expressions between two sets
+allResults indicates whether to return all common regular expressions or whether to only return 1 result
+'''
 def common(set1, set2, allResults=True, p=False):
-	#print "Received : "
-	#print set1
-	#print set2
 	intersection = {}
 	left_intersection = []
 	right_intersection = []
@@ -358,7 +274,11 @@ def common(set1, set2, allResults=True, p=False):
 	l = len(left_intersection) * len(right_intersection)
 	return ( l , intersection)
 	
-	
+
+'''
+find the boolean expressions which match list of points1 and points2 .
+This step is to figure out the Boolean classifier conjuntcs in our language
+'''	
 def findBooleanExpression(points1, points2, examples, value=None):
 	#print "Finding common bool expression for : ",points1, points2
 	tempPoints1 = points1[:]
@@ -402,6 +322,10 @@ def findBooleanExpression(points1, points2, examples, value=None):
 
 	return b
 
+'''
+Generate the predicates in our language. 
+Algorithm once again taken from "S.Gulwani 'Automating string processing in spreadsheets using input-output examples", POPL 2011'
+'''
 def generatePredicate(list1, list2, examples, value, shouldPrint=False):
 	examplePoint = list1[0]
 	exampleKey = [ k for k in examples[examplePoint] ][0]
@@ -497,6 +421,12 @@ def generatePredicate(list1, list2, examples, value, shouldPrint=False):
 		print notMatching2
 	return ( bestPredicate, matching1, notMatching2 )
 
+'''
+A helper function to compute efficient boolean classifiers.
+To find out the utility of the score returned by this function , 
+refer to "S.Gulwani 'Automating string processing in spreadsheets using input-output examples", POPL 2011'
+'''
+
 def computeCSPPos(list1, list2, tokenSequence, position):
 	c1 = 0
 	c2 = 0
@@ -532,7 +462,11 @@ def computeCSPPos(list1, list2, tokenSequence, position):
 	#print "DEBUG 3 : ", tokenSequence, position, c1, c2, list1, list2	
 	return [ c1*c2, matching1, notMatching2 ]
 
-
+'''
+A helper function to compute efficient boolean classifiers.
+To find out the utility of the score returned by this function , 
+refer to "S.Gulwani 'Automating string processing in spreadsheets using input-output examples", POPL 2011'
+'''
 def computeCSP(list1, list2, tokenSequence, numOcc):
 	c1 = 0
 	c2 = 0
@@ -552,7 +486,10 @@ def computeCSP(list1, list2, tokenSequence, numOcc):
 				
 	return [ c1*c2, matching1, notMatching2 ]
 
-		
+'''
+tries to match the boolean classifers in Disjunctive Normal Form (DNF) to a point.
+Refer to "S.Gulwani 'Automating string processing in spreadsheets using input-output examples", POPL 2011' for more details
+'''	
 def match(dnf, point):
 	if dnf == None:
 		return True
@@ -593,7 +530,10 @@ def match(dnf, point):
 	print "Match", dnf, point , "returned False"
 	return False		
 
-
+'''
+applies the learned regular expression on a point
+fail if it cannot apply the learned expression
+'''
 def applyTransform(regex, point, key):
 	
 	# finding left point

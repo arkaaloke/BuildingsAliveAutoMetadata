@@ -14,18 +14,27 @@ class Expand:
 		self.sensorTypeCounts = {}
 		self.oneOffs = {}
 
+	'''
+	If two groups of characters map to the same expanded string
+	'''
 	def putSynonyms(self, newString,syn,key):
 		for group in self.synonyms:
 			if (syn,key) in group:
 				group.append((newString,key))
 
 
+	'''
+	Get synonyms for a particular key
+	'''
 	def getSynonyms(self, string,key):
 		for group in self.synonyms:
 			if (string,key) in group:
 				return [ s for (s,k) in group ]
 
 
+	'''
+	Given a new example, learn new rules for expansion, and merge them with all the rules learned till this point
+	'''
 	def learnIndividualExample(self, example,point, oneOff=False):
 		if oneOff == True:
 			self.oneOffs[point] = {}
@@ -115,7 +124,10 @@ class Expand:
 		#print examples[point][key]["possibilities"]
 
 		#print examples[point]
-			
+		
+	'''
+	Merge (intersect) the rules learned for a point with all other rules learned till now 
+	'''	
 	def intersectKeyPossibilitiesSingle(self, point, findClassifier):
 		count = 1
 		numKeys = len(self.keys)
@@ -161,6 +173,11 @@ class Expand:
 			print "Done key : ",key, count , "/", numKeys
 			count += 1
 			print "\n\n"
+	'''
+	Same as previous function: Merge (intersect) the rules learned for a point with all other rules learned till now 
+	However this function assumes that you are starting from initializing.
+	Bad coding. Should probably merge this with previous function
+	'''	
 
 	def intersectKeyPossibilities(self):
 
@@ -205,7 +222,10 @@ class Expand:
 	 
 			print "\n\n"
 
-
+	'''
+	sort a set of regular expression according to size of regular expressions
+	This helps choose the simplest regular expression to apply on a point
+	'''
 	def sortSet(self, unsortedSet):
 		print "=======UNSORTED SET ========="
 		for i in range(len(unsortedSet)):
@@ -216,6 +236,10 @@ class Expand:
 		return unsortedSet
 		
 
+	'''
+	If there is a file write the current set of rules and state into that file.
+	Is not used when running the evaluation script with ground truth files
+	'''
 	def writeState(self, filename):
 		f = open(filename, "w")
 		f.write(str(self.keys) + "\n")
@@ -225,58 +249,25 @@ class Expand:
 	def getKeys(self):
 		return self.keys
 			
+	'''
+	Reads the state file and populates the set of rules
+	Is not used when running the evaluation script with ground truth files
+	'''
 	def readState(self, filename):
 		lines = open(filename).readlines()
 		self.keys = ast.literal_eval(lines[0].strip())
 		self.keyPredicates = ast.literal_eval(lines[1].strip())
 		self.examples = ast.literal_eval(lines[2].strip())
 
-	def learnExamples(self, filename):
-		lines = open(filename).readlines()
-		count = 0
-		while count + 2 <= len(lines):
-			pointName = lines[count].strip()
-
-			#print "Done : ",count/2, pointName
-			if pointName == "":
-				break
-			expl = lines[count+1].strip()	
-			initial_pos = 0
-			example = {}
-			parts = expl.split(',')
-			key_order = []
-			for part in parts:
-				key = part.strip().split(':')[0].strip()
-				value = part.strip().split(':')[1].strip()
-				example[key] = {}
-				example[key]["value"] = value
-				example[key]["type"] = part.strip().split(':')[-1].strip()
-				#print pointName, initial_pos, value
-				pos = pointName[initial_pos:].index(value)
-				example[key]["pos"] = pos + initial_pos
-				#print "Position of ",key," is ", example[key]["pos"]
-				initial_pos += pos + len(value)
-
-				if len(part.strip().split(':')) > 3:
-					s = part.strip().split(':')[2].strip()
-					example[key]["synonym"] = part.strip().split(':')[2].strip()	
-					putSynonyms(value,s,key)
-				
-				key_order.append((key, example[key]["value"], example[key]["type"]))
-			example["sensorType"] = parts[-1].strip()
-			example["keyOrder"] = key_order
-			#print example
-			learnIndividualExample(example,pointName, False)
-			count += 2
-
 	def init(self):
 		self.examples = {}
 		self.sensorTypeCounts = {}
-		#self.learnExamples(filename)
 		self.intersectKeyPossibilities()
-		#applyOnPoints(allPointsFile)
 		self.initializeGlobal()
 
+	'''
+	Initialize Global variables
+	'''
 	def initializeGlobal(self):
 		print " Initializing global variables "
 		self.expandedPoints = {}
@@ -285,26 +276,10 @@ class Expand:
 
 		print "Initialized variables : ",self.expandedPoints, self.keyPredicates, self.examples
 
-	def checkIfOneOff(self, example, pointName):
-	   
-		tempPoint = list(pointName) 
-		for i in range(len(example["keyOrder"])):
-			
-			(key, v, t) = example["keyOrder"][i] 
-			value = example[key]["value"]
-			valueType = example[key]["type"]
-			pos = example[key]["pos"]
-			for j in range(pos, pos + len(value)):
-				tempPoint[j] = 'x'
-		pointStatus = ''.join(tempPoint)
-		remainingChars = len(re.findall('[A-Z]|[0-9]', pointStatus))
-		if remainingChars > 0:
-			print >>sys.stderr, pointName, " ONEOFF EXAMPLE", pointStatus
-			return True
-		else:
-			return False
 
-
+	'''
+	Generates the rules and possible regular expression breakdowns of a particular new example provided by the expert
+	'''	
 	def learnPointExample(self, pointName, expl):
 		initial_pos = 0
 		example = {}
@@ -335,6 +310,9 @@ class Expand:
 		self.learnIndividualExample(example,pointName, False )
 
 
+	'''
+	Adds a new example which was just supplied by the expert
+	'''
 	def addNewExample(self, point, desc, findClassifier=True):
 		self.sensorTypeCounts = {}
 		self.learnPointExample(point, desc)
@@ -342,6 +320,10 @@ class Expand:
 			return
 		self.intersectKeyPossibilitiesSingle(point, findClassifier)
 
+	'''
+	Applies all the rules learned till now on all the points.
+	This function is called from a `pointcluster` object , so the rules are only applied to that particular cluster
+	'''
 	def applyOnPoints(self, points):
 		print "\n\nApplying on points"
 		pointInfo = {}
@@ -410,10 +392,16 @@ class Expand:
 
 		return False
 
+	'''
+	Returns the stored set of rules, expanded metadata and examples supplied by the expert until now
+	'''
 	def getData(self):
 		return [ self.expandedPoints, self.keyPredicates, self.examples ]
 
 
+	'''
+	Apply transforms based on rules generated onto a point
+	'''
 	def applyAllTransforms(self, regex, point, key):
 		possibleOutputs = []
 		for i in range(len(regex['left'])):

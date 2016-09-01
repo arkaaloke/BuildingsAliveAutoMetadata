@@ -37,6 +37,13 @@ def writeDumpFile(dumpFileName):
 	writeState(dumpFileName)
 
 
+'''
+This is the main script function
+It takes the input original metadata, the ground-truth file already containing the normalized metadata and 
+checks how well our algorithm performs
+At each step this script checks which cluster the next example should be drawn from, which example to ask the expert
+and learns the rules for that example, and applies them to all the points within the cluster
+'''
 def initialize(allPointsFile, filename, labelledExampleFile ):
 	global allExamples
 	global existingExamples
@@ -131,8 +138,6 @@ def initialize(allPointsFile, filename, labelledExampleFile ):
 
 		clusters[nextCluster].addNewExample(newExample, allExamples[newExample])
 		clusters[nextCluster].applyOnPoints()
-		#addExampleToFile(filename, newExample)
-		#addNewExample(newExample, allExamples[newExample])
 
 		print "Result : "
 		print result
@@ -158,6 +163,10 @@ def initialize(allPointsFile, filename, labelledExampleFile ):
 			break
 
 
+'''
+Read pre-computed feature vectors (based on data) of each data stream
+Filename for my local installation --- SodacollectedData-fv
+'''
 def readDataFVS():
 	lines = open("SodacollectedData-fv").readlines()
 	global datafvs
@@ -171,7 +180,9 @@ def readDataFVS():
 
 		datafvs[pointName] = numpy.array(arr)
 
-
+'''
+Learn on data already learned, based on data-based feature vector
+'''
 def getDataBasedExample(examplenum, expType, outfile):
 	global clusters
 	global numclusters
@@ -233,6 +244,10 @@ def getDataBasedExample(examplenum, expType, outfile):
 	print >> outfile, examplenum, tp, fp, tot, len(pointsnotdone) , exampleToReturn
 	return exampleToReturn
 
+'''
+Choose next cluster to normlize
+Here the algorithm is simply to choose the cluster based on which has maximum number of points not yet expanded
+'''
 def getNextCluster( ):
 	global numclusters
 	global clusters
@@ -247,89 +262,11 @@ def getNextCluster( ):
 	print "Next choosing cluster : ", c
 	return c
 
-def exp1():
-	newExample = randomize()
-	if newExample != None:
-		return newExample
 
-	return None
-def exp6():
-	newExample = minLeft()
-	if newExample != None:
-		return newExample
-
-def exp7():
-	newExample = maxLeft()
-	if newExample != None:
-		return newExample
-
-
-def exp8():
-	newExample = maxCommonLeft()
-	if newExample != None:
-		return newExample
-
-
-def exp2():
-
-	newExample = moreThanRequired()
-	if newExample!= None:
-		print "more than required"
-		return newExample
-	
-	newExample = randomize()
-	if newExample != None:
-		return newExample
-
-def exp3():
-	newExample = misclassifiedBoolean()
-	if newExample!= None:
-		return newExample
-	
-	newExample = examplesWhichChanged()
-	if newExample!= None:
-		return newExample
-	
-	newExample = maxLeft()
-	if newExample!= None:
-		return newExample
-
-def exp4():
-	newExample = misclassifiedBoolean()
-	if newExample!= None:
-		return newExample
-
-
-	newExample = moreThanRequired()
-	if newExample!= None:
-		print "more than required"
-		return newExample
-
-
-	newExample = examplesWhichChanged()
-	if newExample!= None:
-		return newExample
-
-	return None
-
-def exp5():
-	return superClassifier()
-
-
-def addExampleToFile(filename, newExample):
-	global existingExamples
-	global allExamples
-
-	print "Adding new example : "
-	print newExample, allExamples[newExample]
-
-	f = open(filename, "a")
-	f.write(str(newExample) + "\n")
-	f.write(str(allExamples[newExample]) + "\n")
-		
-	existingExamples.append(newExample)
-
-
+'''
+Read all the ground truth file where the normalized metadata already exists.
+This will automate the process of figuring out how well our technique does
+'''
 def getAllExamples(exampleFileName, filename):
 	global existingExamples
 	global allExamples
@@ -400,6 +337,9 @@ def getAllExamples(exampleFileName, filename):
 		if labelIndex not in reqd_metadata_label_indices:
 			reqd_metadata_label_indices.append(labelIndex)
 
+'''
+compute the apriori syntactic clustering feature vector
+'''
 def getFeatureVector2(point):
 	global specialCharTable
 	
@@ -424,7 +364,9 @@ def getFeatureVector2(point):
 		string = re.sub(str(i) + "+", str(i) , string)
 	return list(string)
 
-
+'''
+Create a matrix with all feature vectors
+''' 
 def createMatrix( pointList, allPoints, fvs ):
 	x = []
 	for point in pointList:
@@ -433,6 +375,9 @@ def createMatrix( pointList, allPoints, fvs ):
 
 	return x
 
+''' 
+create the apriori syntactic clustering of points
+'''
 def clusterPoints( ):
 	global allExamples
 	global specialCharTable
@@ -519,34 +464,9 @@ def clusterPoints( ):
 
 	subcluster()
 
-def none(cluster_points):
-	global cluster_number
-	global all_clusters
-	curr_cluster_number = cluster_number
-	all_clusters[ cluster_number] = cluster_points
-	cluster_number += 1
-
-def getFeatureVector1(point):
-	global specialCharTable
-	
-	point = point.upper()
-	fv = []	
-	for i in range(len(point)):
-		if len(re.compile('[A-Z]').findall(point[i])) == 1:
-			fv.append(1)
-		elif len(re.compile('[0-9]').findall(point[i])) == 1:
-			fv.append(2)
-		else:
-			specialChar = point[i]
-			if specialChar not in specialCharTable:
-				val = len(specialCharTable) + 3
-				specialCharTable[ specialChar ] = val
-			fv.append( specialCharTable[ specialChar ] )
-
-
-	return fv
-
-
+'''
+Subcluster if necessary within the clusters
+'''
 def subcluster(opt="none"):
 	global hierarchy
 	global final_leaves
@@ -606,6 +526,9 @@ def subcluster(opt="none"):
 		count += 1
 		numclusters += 1
 
+'''
+split the input file into a separate file for each cluster
+'''
 def splitFile(pointList, clusternum):
 	global gt
 	global clusters
